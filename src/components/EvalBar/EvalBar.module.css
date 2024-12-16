@@ -1,0 +1,36 @@
+.EvalBar {
+    position: relative;
+    width: 24px;
+    min-width: 24px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--surface-dim-color);
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.line {
+    width: 100%;
+    transition: height 0.3s ease;
+}
+
+.white {
+    background-color: var(--color);
+}
+
+.black {
+    background-color: var(--surface-dim-color);
+}
+
+.value {
+    position: fixed;
+    font-size: 0.85rem;
+    color: var(--color);
+    background-color: var(--surface-dim-color);
+    padding: 4px 8px;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 1000;
+    transform: translate(-100%, -100%);
+}

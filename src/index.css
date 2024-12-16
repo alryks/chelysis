@@ -1,0 +1,50 @@
+:root {
+    --primary-color: hsl(60, 25%, 50%);
+    --secondary-color: hsl(60, 25%, 75%);
+    --surface-color: hsl(60, 13%, 25%);
+    --surface-dim-color: hsl(60, 13%, 13%);
+    --color: hsl(0, 0%, 100%);
+    --error-color: hsl(0, 50%, 50%);
+
+    --forced-color: rgb(150, 175, 139);
+    --brilliant-color: rgb(38, 192, 161);
+    --great-find-color: rgb(116, 155, 191);
+    --best-color: rgb(129, 182, 76);
+    --excellent-color: rgb(129, 182, 76);
+    --good-color: rgb(149, 183, 118);
+    --book-color: rgb(213, 164, 125);
+    --inaccuracy-color: rgb(247, 198, 49);
+    --mistake-color: rgb(255, 164, 89);
+    --miss-color: rgb(255, 119, 105);
+    --blunder-color: rgb(250, 65, 45);
+
+    --forced-background-color: rgba(150, 175, 139, 0.75);
+    --brilliant-background-color: rgba(38, 192, 161, 0.75);
+    --great-find-background-color: rgba(116, 155, 191, 0.75);
+    --best-background-color: rgba(129, 182, 76, 0.75);
+    --excellent-background-color: rgba(129, 182, 76, 0.75);
+    --good-background-color: rgba(149, 183, 118, 0.75);
+    --book-background-color: rgba(213, 164, 125, 0.75);
+    --inaccuracy-background-color: rgba(247, 198, 49, 0.75);
+    --mistake-background-color: rgba(255, 164, 89, 0.75);
+    --miss-background-color: rgba(255, 119, 105, 0.75);
+    --blunder-background-color: rgba(250, 65, 45, 0.75);
+
+    --move-background-color: hsla(60, 100%, 50%, 0.5);
+}
+
+* {
+    font-family: 'Kode Mono', monospace;
+    font-size: 1rem;
+    color: var(--color);
+
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html, body, #root {
+    width: 100%;
+    height: 100%;
+    background-color: var(--surface-color);
+}

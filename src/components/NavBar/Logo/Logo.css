@@ -1,0 +1,16 @@
+.logo {
+    width: fit-content;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.logo-svg {
+    width: auto;
+    height: 100%;
+}
+
+.logo-path {
+    fill: var(--color);
+}
