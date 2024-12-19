@@ -1,7 +1,8 @@
 :root {
-    --primary-color: hsl(60, 25%, 50%);
+    --primary-color: hwb(60 38% 38%);
     --secondary-color: hsl(60, 25%, 75%);
     --surface-color: hsl(60, 13%, 25%);
+    --surface-accent-color: hsl(60, 13%, 20%);
     --surface-dim-color: hsl(60, 13%, 13%);
     --color: hsl(0, 0%, 100%);
     --error-color: hsl(0, 50%, 50%);

@@ -34,6 +34,7 @@ function App() {
     const analysisOn = useSelector((state) => state.analysis.analysisOn);
 
     const [contentHeight, setContentHeight] = useState("100%");
+    const [analysisHeight, setAnalysisHeight] = useState("100%");
 
     function getDimensions(element) {
         const style = window.getComputedStyle(element);
@@ -53,9 +54,11 @@ function App() {
             if (dimensions.width - 24 <= dimensions.height) {
                 dispatch(setBoardWidth(dimensions.width - 24));
                 setContentHeight(`${contentRef.current.clientWidth - 24}px`);
+                setAnalysisHeight(`${2 * (contentRef.current.clientWidth - 24)}px`);
             } else {
                 dispatch(setBoardWidth(dimensions.height));
                 setContentHeight("100%");
+                setAnalysisHeight("100%");
             }
         }
     }
@@ -133,7 +136,7 @@ function App() {
                         turn={new Chess(game[currentMove].fen).turn()}
                     />
                 </div>
-                <Analysis />
+                <Analysis analysisHeight={analysisHeight} />
             </div>
         </div>
     );

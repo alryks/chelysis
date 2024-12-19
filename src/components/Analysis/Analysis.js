@@ -95,7 +95,10 @@ function calculateAccuracy(bestEval, moveEval) {
             classification:
                 (100 /
                     (1 +
-                        Math.exp((bestEval.score - moveEval.score) / Math.E))) *
+                        Math.pow(
+                            Math.PI,
+                            (bestEval.score - moveEval.score) / Math.PI
+                        ))) *
                 2,
         };
     } else {
@@ -106,110 +109,64 @@ function calculateAccuracy(bestEval, moveEval) {
     }
 }
 
-function getAttackerDefenderDifference(game, nextMove) {
-    let attacker = 0;
-    let defender = 0; // who made first move
+const pieceCost = {
+    p: 1,
+    n: 3,
+    b: 3,
+    r: 5,
+    q: 9,
+    k: 0,
+};
 
-    const maxDefender = { value: null, moveCount: null };
-    const maxAttacker = { value: null, moveCount: null };
+function getAttackers(game) {
+    const attackers = {};
+    for (const attacker of game.moves({ verbose: true })) {
+        if (!attacker.captured) continue;
+        attackers[attacker.to] = attackers[attacker.to]
+            ? [...attackers[attacker.to], attacker]
+            : [attacker];
+    }
+    // sort each array in attackers by piece value
+    for (const square in attackers) {
+        attackers[square].sort((a, b) => {
+            return pieceCost[a.piece] - pieceCost[b.piece];
+        });
+    }
+    return attackers;
+}
 
-    const position = nextMove.to;
-
-    const pieceCost = {
-        p: 1,
-        n: 3,
-        b: 3,
-        r: 5,
-        q: 9,
-        k: 1000,
-    };
-    const startTurn = game.turn();
-    let moveCount = 0;
-    while (nextMove !== null) {
-        let buffer = 0;
-        buffer += game.get(position) ? pieceCost[game.get(position).type] : 0;
-        buffer += nextMove.promotion ? pieceCost[nextMove.promotion] : 0;
-        if (startTurn === game.turn()) {
-            defender += buffer;
-        } else {
-            attacker += buffer;
-        }
-        game.move(nextMove);
-        moveCount++;
-
-        const moves = game
+function getDefenders(game) {
+    const board = new Chess(game.fen());
+    const defenders = {};
+    for (const attacker of board.moves({ verbose: true })) {
+        if (!attacker.captured) continue;
+        board.move(attacker);
+        let moves = board
             .moves({ verbose: true })
-            .filter((move) => move.to === position);
-        const moveValues = moves.map((move, index) => [
-            index,
-            pieceCost[move.piece],
-        ]);
-        const minMove = moveValues.reduce(
-            (min, move) => (move[1] < min[1] ? move : min),
-            [null, Infinity]
-        );
-        nextMove = minMove[0] !== null ? moves[minMove[0]] : null;
-
-        if (game.turn() === startTurn) {
-            if (
-                maxDefender.value === null ||
-                maxDefender.value < defender - attacker
-            ) {
-                maxDefender.value = defender - attacker;
-                maxDefender.moveCount = moveCount;
-            }
-            if (nextMove === null) {
-                if (
-                    maxAttacker.value === null ||
-                    maxAttacker.value < attacker - defender
-                ) {
-                    maxAttacker.value = attacker - defender;
-                    maxAttacker.moveCount = moveCount;
-                }
-            }
+            .filter((move) => move.to === attacker.to);
+        if (!defenders[attacker.to]) {
+            defenders[attacker.to] = moves;
         } else {
-            if (
-                maxAttacker.value === null ||
-                maxAttacker.value < attacker - defender
-            ) {
-                maxAttacker.value = attacker - defender;
-                maxAttacker.moveCount = moveCount;
-            }
-            if (nextMove === null) {
-                if (
-                    maxDefender.value === null ||
-                    maxDefender.value < defender - attacker
-                ) {
-                    maxDefender.value = defender - attacker;
-                    maxDefender.moveCount = moveCount;
-                }
-            }
+            // append only moves that are not already in defenders, check that comparing lan
+            moves = moves.filter(
+                (move) =>
+                    !defenders[attacker.to].some((m) => m.lan === move.lan)
+            );
+            defenders[attacker.to] = [...defenders[attacker.to], ...moves];
         }
+        board.undo();
     }
-
-    let result = attacker - defender;
-    if (maxDefender.moveCount !== null && maxAttacker.moveCount === null) {
-        result = -maxDefender.value;
-    } else if (
-        maxAttacker.moveCount !== null &&
-        maxDefender.moveCount === null
-    ) {
-        result = maxAttacker.value;
-    } else if (
-        maxAttacker.moveCount !== null &&
-        maxDefender.moveCount !== null
-    ) {
-        if (maxAttacker.moveCount >= maxDefender.moveCount) {
-            result = -maxDefender.value;
-        } else {
-            result = maxAttacker.value;
-        }
+    // sort each array in defenders by piece value
+    for (const square in defenders) {
+        defenders[square].sort((a, b) => {
+            return pieceCost[a.piece] - pieceCost[b.piece];
+        });
     }
-
-    return result;
+    return defenders;
 }
 
 function isSacrifice(game, move) {
+
     const board = new Chess(game.fen());
     const moveObj = {
         from: move.slice(0, 2),
@@ -219,200 +176,116 @@ function isSacrifice(game, move) {
         moveObj.promotion = move[4];
     }
 
-    const attackerDefenderDifference = getAttackerDefenderDifference(
-        board,
-        moveObj
-    );
+    let attackerValue = 0;
+    const targetPiece = board.get(moveObj.to);
+    let defenderValue =
+        targetPiece && targetPiece.type ? pieceCost[targetPiece.type] : 0;
 
-    return attackerDefenderDifference > 0;
+
+    board.move(moveObj);
+
+    const attackers = getAttackers(board);
+    const defenders = getDefenders(board);
+
+    let pawnTaken = false;
+
+    for (const square in attackers) {
+        let lastPiece = board.get(square).type;
+
+        while (attackers[square].length > 0) {
+            if (
+                pieceCost[lastPiece] < pieceCost[attackers[square][0].piece] &&
+                defenders[square] &&
+                defenders[square].length > 0
+            ) {
+                break;
+            }
+            if (lastPiece === "p") pawnTaken = true;
+
+            attackerValue += pieceCost[lastPiece];
+            lastPiece = attackers[square].shift().piece;
+            if (attackers[square].length === 0) {
+                if (!defenders[square] || defenders[square].length === 0) {
+                    break;
+                }
+                if (lastPiece === "p") pawnTaken = true;
+
+                defenderValue += pieceCost[lastPiece];
+                break;
+            }
+            if (!defenders[square] || defenders[square].length === 0) {
+                break;
+            }
+            if (pieceCost[lastPiece] < pieceCost[defenders[square][0].piece]) {
+                break;
+            }
+            if (lastPiece === "p") pawnTaken = true;
+
+            defenderValue += pieceCost[lastPiece];
+            lastPiece = defenders[square].shift().piece;
+
+            if (!defenders[square] || defenders[square].length === 0) {
+                if (attackers[square].length === 0) {
+                    break;
+                }
+                if (lastPiece === "p") pawnTaken = true;
+
+                attackerValue += pieceCost[lastPiece];
+                lastPiece = attackers[square].shift().piece;
+            }
+            if (attackers[square].length === 0) {
+                break;
+            }
+            if (pieceCost[lastPiece] < pieceCost[attackers[square][0].piece]) {
+                break;
+            }
+        }
+    }
+
+    return {
+        sacrifice: attackerValue > defenderValue,
+        pawnTaken,
+    };
 }
 
 function isPawn(game, move) {
     return game.get(move.slice(0, 2)).type === "p";
 }
 
-function classifyMoves(game, moveEvaluations, opponentMoveClassification) {
+function isKing(game, move) {
+    return game.get(move.slice(0, 2)).type === "k";
+}
+
+function isBrilliant(game, playedMove, accuracy) {
+    const { sacrifice, pawnTaken } = isSacrifice(game, playedMove.move);
+    return (
+        accuracy > 90 &&
+        sacrifice &&
+        !pawnTaken &&
+        !isPawn(game, playedMove.move) &&
+        (!isKing(game, playedMove.move) || !game.isCheck())
+    );
+}
+
+function isGreatFind(prevGame, playedMove, secondBestMove) {
+    return (
+        ((playedMove.scoreType !== "mate" &&
+            (secondBestMove.scoreType === "mate" ||
+                (playedMove.score > 1 && secondBestMove.score <= 1) ||
+                (playedMove.score > -1 && secondBestMove.score <= -1))) ||
+            (playedMove.scoreType === "mate" &&
+                secondBestMove.scoreType !== "mate")) &&
+        (!prevGame ||
+            !isSacrifice(new Chess(prevGame.fen), prevGame.playedMove.move.move)
+                .sacrifice)
+    );
+}
+
+function classifyMoves(game, prevGame, moveEvaluations) {
     let { bestMoves, playedMove } = moveEvaluations;
     bestMoves = bestMoves.filter((move) => move.move !== null);
 
-    if (bestMoves.length >= 1) {
-        // First best move
-        bestMoves[0].classification = "best";
-
-        if (
-            isSacrifice(game, bestMoves[0].move) &&
-            !isPawn(game, bestMoves[0].move)
-        ) {
-            bestMoves[0].classification = "brilliant";
-        }
-
-        if (bestMoves.length === 1) {
-            bestMoves[0].classification = "forced";
-        } else {
-            // Second best move
-            if (
-                calculateAccuracy(bestMoves[0], bestMoves[1]).classification >=
-                80
-            ) {
-                bestMoves[1].classification = "excellent";
-                if (
-                    isSacrifice(game, bestMoves[1].move) &&
-                    !isPawn(game, bestMoves[1].move)
-                ) {
-                    bestMoves[1].classification = "brilliant";
-                }
-            } else if (
-                calculateAccuracy(bestMoves[0], bestMoves[1]).classification >=
-                60
-            ) {
-                bestMoves[1].classification = "inaccuracy";
-                if (
-                    opponentMoveClassification === "mistake" ||
-                    opponentMoveClassification === "blunder"
-                ) {
-                    bestMoves[1].classification = "miss";
-                }
-            } else {
-                bestMoves[1].classification = "mistake";
-            }
-
-            if (bestMoves.length >= 3) {
-                // Third best move
-                if (
-                    calculateAccuracy(bestMoves[0], bestMoves[2])
-                        .classification >= 80
-                ) {
-                    bestMoves[2].classification = "excellent";
-                } else if (
-                    calculateAccuracy(bestMoves[0], bestMoves[2])
-                        .classification >= 60
-                ) {
-                    bestMoves[2].classification = "inaccuracy";
-                    if (
-                        bestMoves[1].classification === "excellent" ||
-                        bestMoves[1].classification === "brilliant"
-                    ) {
-                        bestMoves[2].classification = "good";
-                    }
-                    if (
-                        opponentMoveClassification === "mistake" ||
-                        opponentMoveClassification === "blunder"
-                    ) {
-                        bestMoves[2].classification = "miss";
-                    }
-                } else if (
-                    isSacrifice(game, bestMoves[2].move) ||
-                    calculateAccuracy(bestMoves[0], bestMoves[2])
-                        .classification === 0
-                ) {
-                    bestMoves[2].classification = "blunder";
-                } else {
-                    bestMoves[2].classification = "mistake";
-                }
-
-                if (bestMoves.length >= 4) {
-                    // Fourth best move
-                    if (
-                        calculateAccuracy(bestMoves[0], bestMoves[3])
-                            .classification >= 60
-                    ) {
-                        bestMoves[3].classification = "inaccuracy";
-                        if (bestMoves[2].classification === "excellent") {
-                            bestMoves[3].classification = "good";
-                        }
-                        if (
-                            opponentMoveClassification === "mistake" ||
-                            opponentMoveClassification === "blunder"
-                        ) {
-                            bestMoves[3].classification = "miss";
-                        }
-                    } else if (
-                        isSacrifice(game, bestMoves[3].move) ||
-                        calculateAccuracy(bestMoves[0], bestMoves[3])
-                            .classification === 0
-                    ) {
-                        bestMoves[3].classification = "blunder";
-                    } else {
-                        bestMoves[3].classification = "mistake";
-                    }
-
-                    if (bestMoves.length >= 5) {
-                        // Fifth best move
-                        if (
-                            calculateAccuracy(bestMoves[0], bestMoves[4])
-                                .classification >= 60
-                        ) {
-                            bestMoves[4].classification = "inaccuracy";
-                            if (bestMoves[2].classification === "excellent") {
-                                bestMoves[4].classification = "good";
-                            }
-                            if (
-                                opponentMoveClassification === "mistake" ||
-                                opponentMoveClassification === "blunder"
-                            ) {
-                                bestMoves[4].classification = "miss";
-                            }
-                        } else if (
-                            isSacrifice(game, bestMoves[4].move) ||
-                            calculateAccuracy(bestMoves[0], bestMoves[4])
-                                .classification === 0
-                        ) {
-                            bestMoves[4].classification = "blunder";
-                        } else {
-                            bestMoves[4].classification = "mistake";
-                        }
-                    }
-                }
-            }
-
-            if (
-                ["inaccuracy", "miss", "blunder", "mistake"].includes(
-                    bestMoves[1].classification
-                )
-            ) {
-                bestMoves[0].classification = "greatFind";
-            }
-        }
-    }
-
-    for (const move of bestMoves) {
-        const moveObj = {
-            from: move.move.slice(0, 2),
-            to: move.move.slice(2, 4),
-        };
-        if (move.move.length > 4) {
-            moveObj.promotion = move.move[4];
-        }
-        game.move(moveObj);
-        if (findOpening(game.fen())) {
-            move.classification = "book";
-        }
-        game.undo();
-    }
-
-    for (const move of bestMoves) {
-        if (playedMove.move === move.move) {
-            playedMove.classification = move.classification;
-            return { bestMoves, playedMove };
-        }
-    }
-
-    if (calculateAccuracy(bestMoves[0], playedMove).classification >= 60) {
-        playedMove.classification = "inaccuracy";
-        if (
-            opponentMoveClassification === "mistake" ||
-            opponentMoveClassification === "blunder"
-        ) {
-            playedMove.classification = "miss";
-        }
-    } else if (
-        isSacrifice(game, playedMove.move) ||
-        calculateAccuracy(bestMoves[0], playedMove).classification === 0
-    ) {
-        playedMove.classification = "blunder";
-    } else {
-        playedMove.classification = "mistake";
-    }
+    if (bestMoves.length === 0) return null;
 
     const moveObj = {
         from: playedMove.move.slice(0, 2),
@@ -423,14 +296,59 @@ function classifyMoves(game, moveEvaluations, opponentMoveClassification) {
     }
     game.move(moveObj);
     if (findOpening(game.fen())) {
-        playedMove.classification = "book";
+        return "book";
     }
     game.undo();
 
-    return { bestMoves, playedMove };
+    if (bestMoves.length === 1) return "forced";
+
+    const accuracy = calculateAccuracy(bestMoves[0], playedMove).classification;
+
+    let classification = null;
+    if (bestMoves[0].move === playedMove.move) {
+        classification = "best";
+        if (isGreatFind(prevGame, playedMove, bestMoves[1]))
+            classification = "greatFind";
+        if (isBrilliant(game, playedMove, accuracy))
+            classification = "brilliant";
+        return classification;
+    }
+
+    if (accuracy <= 70) return "blunder";
+    if (70 < accuracy && accuracy <= 90) {
+        if (
+            ["mistake", "blunder", "miss"].includes(
+                prevGame ? prevGame.playedMove.move.classification : null
+            )
+        )
+            return "miss";
+        if (
+            playedMove.scoreType !== "mate" &&
+            bestMoves[0].score >= 0.1 &&
+            playedMove.score <= -0.1
+        )
+            return "mistake";
+    }
+    if (accuracy > 80) {
+        if (
+            playedMove.scoreType !== "mate" &&
+            bestMoves[0].score >= 0.1 &&
+            Math.abs(playedMove.score) < 0.1
+        )
+            return "inaccuracy";
+        if (
+            playedMove.scoreType !== "mate" &&
+            Math.abs(bestMoves[0].score) < 0.1 &&
+            playedMove.score <= -0.1
+        )
+            return "inaccuracy";
+        if (accuracy > 90) return "excellent";
+        return "good";
+    }
+    return "good";
 }
 
-function Analysis() {
+function Analysis({ analysisHeight }) {
     const dispatch = useDispatch();
 
     const game = useSelector((state) => state.game.game);
@@ -463,32 +381,22 @@ function Analysis() {
             game[currentMove - 1].playedMove.status === "done" &&
             game[currentMove - 1].bestMoves.status === "done"
         ) {
-            const { bestMoves, playedMove } = classifyMoves(
+            const classification = classifyMoves(
                 new Chess(game[currentMove - 1].fen),
+                currentMove > 1 ? game[currentMove - 2] : null,
                 {
-                    bestMoves: JSON.parse(
-                        JSON.stringify(game[currentMove - 1].bestMoves.moves)
-                    ),
-                    playedMove: JSON.parse(
-                        JSON.stringify(game[currentMove - 1].playedMove.move)
-                    ),
+                    bestMoves: game[currentMove - 1].bestMoves.moves,
+                    playedMove: game[currentMove - 1].playedMove.move,
+                }
+            );
+            const newPlayedMove = {
+                ...game[currentMove - 1].playedMove,
+                move: {
+                    ...game[currentMove - 1].playedMove.move,
+                    classification,
                 },
-                currentMove > 1
-                    ? game[currentMove - 2].playedMove.classification
-                    : null
-            );
-            dispatch(
-                setBestMoves({
-                    ...game[currentMove - 1].bestMoves,
-                    moves: bestMoves,
-                })
-            );
-            dispatch(
-                setPlayedMove({
-                    ...game[currentMove - 1].playedMove,
-                    move: playedMove,
-                })
-            );
+            };
+            dispatch(setPlayedMove(newPlayedMove));
 
             dispatch(
                 findBestMoves({
@@ -676,7 +584,7 @@ function Analysis() {
     };
 
     return (
-        <div className={styles.analysis}>
+        <div className={styles.analysis} style={{ height: analysisHeight }}>
             <div className={styles.content}>
                 <div className={styles.start}>
                     <span className={styles.title}>Game analysis</span>

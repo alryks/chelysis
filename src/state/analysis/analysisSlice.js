@@ -19,7 +19,7 @@ export const startStockfish = createAsyncThunk(
         };
 
         stockfish.postMessage("uci");
-        stockfish.postMessage(`setoption name MultiPV value 5}`);
+        stockfish.postMessage(`setoption name MultiPV value 2}`);
         stockfish.postMessage("ucinewgame");
         stockfish.postMessage("isready");
     }
@@ -107,7 +107,7 @@ export const analysisSlice = createSlice({
                 state.stockfishMove = action.payload.moveIndex;
                 state.stockfishBestMoves = { status: "pending", moveIndex: action.payload.moveIndex, moves: [] };
                 stockfishService.postMessage(`position fen ${action.payload.fen}`);
-                stockfishService.postMessage("go depth 8 movetime 500");
+                stockfishService.postMessage("go depth 12");
             }
         },
         evaluateCurrentMove: (state, action) => {
@@ -117,7 +117,7 @@ export const analysisSlice = createSlice({
                     `position fen ${action.payload.fen}`
                 );
                 stockfishService.postMessage(
-                    `go depth 8 movetime 500 searchmoves ${action.payload.move}`
+                    `go depth 12 searchmoves ${action.payload.move}`
                 );
             }
         },
