@@ -225,10 +225,10 @@ function Chessboard() {
         };
 
         // Устанавливаем новый интервал
-        if (stockfishOn && !arrowsTimeoutRef.current) {
+        if (stockfishOn && (!arrowsTimeoutRef.current || game[currentMove].bestMoves.status === "done")) {
             arrowsTimeoutRef.current = setTimeout(updateArrows, 100);
         }
-    }, [stockfishOn, currentMove, multiPV, game[currentMove].bestMoves.moves]);
+    }, [stockfishOn, currentMove, multiPV, game[currentMove].bestMoves]);
 
     useEffect(() => {
         setArrows([]);

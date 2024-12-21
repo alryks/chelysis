@@ -68,9 +68,9 @@ function calculateAccuracy(bestEval, moveEval) {
     let value = null;
     if (bestEval.scoreType === "mate" && moveEval.scoreType === "mate") {
         if (bestEval.score > 0 && moveEval.score > 0) {
-            value = (bestEval.score / moveEval.score) * 100;
+            value = 100;
         } else if (bestEval.score < 0 && moveEval.score < 0) {
-            value = (moveEval.score / bestEval.score) * 100;
+            value = 100;
         } else if (bestEval.score > 0 && moveEval.score < 0) {
             value = 0;
         } else {
@@ -243,7 +243,7 @@ function isSacrifice(game, move) {
     }
 
     return {
-        sacrifice: attackerValue > defenderValue,
+        sacrifice: attackerValue - defenderValue,
         pawnTaken,
     };
 }
@@ -260,7 +260,7 @@ function isBrilliant(game, playedMove, accuracy) {
     const { sacrifice, pawnTaken } = isSacrifice(game, playedMove.move);
     return (
         accuracy > 90 &&
-        sacrifice &&
+        sacrifice > 0 &&
         !pawnTaken &&
         !isPawn(game, playedMove.move) &&
         (!isKing(game, playedMove.move) || !game.isCheck())
@@ -268,17 +268,28 @@ function isBrilliant(game, playedMove, accuracy) {
 }
 
 function isGreatFind(prevGame, playedMove, secondBestMove) {
-    return (
-        ((playedMove.scoreType !== "mate" &&
-            (secondBestMove.scoreType === "mate" ||
-                (playedMove.score > 1 && secondBestMove.score <= 1) ||
-                (playedMove.score > -1 && secondBestMove.score <= -1))) ||
-            (playedMove.scoreType === "mate" &&
-                secondBestMove.scoreType !== "mate")) &&
-        (!prevGame ||
-            !isSacrifice(new Chess(prevGame.fen), prevGame.playedMove.move.move)
-                .sacrifice)
-    );
+    if (prevGame && isSacrifice(new Chess(prevGame.fen), prevGame.playedMove.move.move).sacrifice >= 0)
+        return false;
+    if (playedMove.scoreType !== "mate") {
+        if (secondBestMove.scoreType === "mate")
+            return true;
+        if ((playedMove.score > 1 && secondBestMove.score <= 1) || (playedMove.score > -1 && secondBestMove.score <= -1))
+            return true;
+    }
+    else if (playedMove.score > 0) {
+        if (secondBestMove.scoreType === "mate") {
+            if (secondBestMove.score > 0)
+                return false;
+            else
+                return true;
+        }
+        else {
+            return true;
+        }
+    }
+    else {
+        return false;
+    }
 }
 
 function classifyMoves(game, prevGame, moveEvaluations) {

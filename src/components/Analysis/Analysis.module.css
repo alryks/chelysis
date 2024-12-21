@@ -7,17 +7,19 @@
     height: 100%;
     background-color: var(--surface-accent-color);
     padding: 16px;
+    padding-bottom: 0;
     gap: 8px;
+    position: relative;
 }
 
 .content {
     display: flex;
     flex-direction: column;
     align-items: center;
-    height: calc(100% - 56px);
     width: 100%;
-
+    height: calc(100% - 88px);
     gap: 16px;
+    overflow-y: auto;
 }
 
 .start {
@@ -261,7 +263,12 @@
     flex-direction: column;
     gap: 8px;
     width: 100%;
-    height: 56px;
+    height: 88px;
+    position: sticky;
+    bottom: 0px;
+    left: 0;
+    padding: 16px;
+    z-index: 10;
 }
 
 .arrowsControl {
