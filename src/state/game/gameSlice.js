@@ -7,13 +7,13 @@ export const gameSlice = createSlice({
         game: [
             {
                 fen: new Chess().fen(),
-                bestMoves: { status: "set", multiPV: 0, moves: [] },
+                bestMoves: { status: "set", moves: [] },
                 playedMove: null,
             },
         ],
         currentMove: 0,
         boardOrientation: "white",
-        multiPV: 1,
+        arrowsCount: 2,
         boardWidth: 600,
     },
     reducers: {
@@ -22,7 +22,7 @@ export const gameSlice = createSlice({
             state.game = [
                 {
                     fen: new Chess().fen(),
-                    bestMoves: { status: "set", multiPV: 0, moves: [] },
+                    bestMoves: { status: "set", moves: [] },
                     playedMove: null,
                 },
             ];
@@ -33,7 +33,7 @@ export const gameSlice = createSlice({
                 newGame.move(move);
                 state.game.push({
                     fen: newGame.fen(),
-                    bestMoves: { status: "set", multiPV: 0, moves: [] },
+                    bestMoves: { status: "set", moves: [] },
                     playedMove: null,
                 });
             });
@@ -49,16 +49,13 @@ export const gameSlice = createSlice({
             ) {
                 state.game = [
                     ...state.game.slice(0, state.currentMove + 1),
-                    { fen: newGame.fen(), bestMoves: { status: "set", multiPV: 0, moves: [] }, playedMove: null },
+                    { fen: newGame.fen(), bestMoves: { status: "set", moves: [] }, playedMove: null },
                 ];
                 let moveStr = action.payload.from + action.payload.to;
                 if (action.payload.promotion) moveStr += action.payload.promotion;
                 state.game[state.currentMove].playedMove = {status: "set", move: {move: moveStr, classification: "normal"}};
             }
             state.currentMove++;
-        },
-        setMultiPV: (state, action) => {
-            state.multiPV = action.payload;
         },
         setBestMoves: (state, action) => {
             if (action.payload.moveIndex < state.game.length) {
@@ -86,6 +83,9 @@ export const gameSlice = createSlice({
         goToEnd: (state) => {
             state.currentMove = state.game.length - 1;
         },
+        setArrowsCount: (state, action) => {
+            state.arrowsCount = action.payload;
+        },
         switchBoardOrientation: (state) => {
             state.boardOrientation =
                 state.boardOrientation === "white" ? "black" : "white";
@@ -99,13 +99,13 @@ export const gameSlice = createSlice({
 export const {
     setGame,
     move,
-    setMultiPV,
     setBestMoves,
     setPlayedMove,
     goBack,
     goForward,
     goToStart,
     goToEnd,
+    setArrowsCount,
     switchBoardOrientation,
     setBoardWidth,
 } = gameSlice.actions;

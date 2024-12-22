@@ -32,7 +32,7 @@ function Chessboard() {
     const boardOrientation = useSelector(
         (state) => state.game.boardOrientation
     );
-    const multiPV = useSelector((state) => state.game.multiPV);
+    const arrowsCount = useSelector((state) => state.game.arrowsCount);
 
     const stockfishOn = useSelector((state) => state.analysis.stockfishOn);
 
@@ -209,7 +209,7 @@ function Chessboard() {
                     }
                 });
                 
-                const newArrows = newMoves.slice(0, multiPV).map((move, index) => [
+                const newArrows = newMoves.slice(0, arrowsCount).map((move, index) => [
                     move.slice(0, 2),
                     move.slice(2, 4),
                     `rgba(255, 255, 255, ${1 - index * 0.2})`,
@@ -228,7 +228,7 @@ function Chessboard() {
         if (stockfishOn && (!arrowsTimeoutRef.current || game[currentMove].bestMoves.status === "done")) {
             arrowsTimeoutRef.current = setTimeout(updateArrows, 100);
         }
-    }, [stockfishOn, currentMove, multiPV, game[currentMove].bestMoves]);
+    }, [stockfishOn, currentMove, arrowsCount, game[currentMove].bestMoves]);
 
     useEffect(() => {
         setArrows([]);

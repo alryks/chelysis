@@ -19,7 +19,7 @@ export const startStockfish = createAsyncThunk(
         };
 
         stockfish.postMessage("uci");
-        stockfish.postMessage(`setoption name MultiPV value 2}`);
+        stockfish.postMessage(`setoption name MultiPV value 5}`);
         stockfish.postMessage("ucinewgame");
         stockfish.postMessage("isready");
     }

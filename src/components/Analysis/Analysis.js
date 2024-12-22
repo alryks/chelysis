@@ -38,9 +38,9 @@ import {
     goForward,
     goToEnd,
     goToStart,
+    setArrowsCount,
     setBestMoves,
     setGame,
-    setMultiPV,
     setPlayedMove,
     switchBoardOrientation,
 } from "../../state/game/gameSlice";
@@ -364,7 +364,7 @@ function Analysis({ analysisHeight }) {
 
     const game = useSelector((state) => state.game.game);
     const currentMove = useSelector((state) => state.game.currentMove);
-    const multiPV = useSelector((state) => state.game.multiPV);
+    const arrowsCount = useSelector((state) => state.game.arrowsCount);
 
     const stockfishOn = useSelector((state) => state.analysis.stockfishOn);
     const stockfishReady = useSelector(
@@ -754,13 +754,13 @@ function Analysis({ analysisHeight }) {
                         type="range"
                         min="0"
                         max="5"
-                        value={multiPV}
+                        value={arrowsCount}
                         onChange={(e) =>
-                            dispatch(setMultiPV(parseInt(e.target.value)))
+                            dispatch(setArrowsCount(parseInt(e.target.value)))
                         }
                         className={styles.slider}
                     />
-                    <span className={styles.arrowsCount}>{multiPV}</span>
+                    <span className={styles.arrowsCount}>{arrowsCount}</span>
                 </div>
             </div>
         </div>
