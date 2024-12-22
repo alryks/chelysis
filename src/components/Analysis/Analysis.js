@@ -261,6 +261,7 @@ function isBrilliant(game, playedMove, accuracy) {
     return (
         accuracy > 90 &&
         sacrifice > 0 &&
+        (playedMove.scoreType !== "mate" || playedMove.score > 0) &&
         !pawnTaken &&
         !isPawn(game, playedMove.move) &&
         (!isKing(game, playedMove.move) || !game.isCheck())
