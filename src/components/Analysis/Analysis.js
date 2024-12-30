@@ -256,13 +256,14 @@ function isKing(game, move) {
     return game.get(move.slice(0, 2)).type === "k";
 }
 
-function isBrilliant(game, playedMove, accuracy) {
+function isBrilliant(game, playedMove, secondBestMove, accuracy) {
     const { sacrifice, pawnTaken } = isSacrifice(game, playedMove.move);
     return (
         accuracy > 90 &&
         sacrifice > 0 &&
-        (playedMove.scoreType !== "mate" || playedMove.score > 0) &&
         !pawnTaken &&
+        (playedMove.scoreType !== "mate" && playedMove.score >= -1 || playedMove.scoreType === "mate" && playedMove.score > 0) &&
+        (secondBestMove.scoreType !== "mate" && secondBestMove.score <= 1 || secondBestMove.scoreType === "mate" && secondBestMove.score < 0) &&
         !isPawn(game, playedMove.move) &&
         (!isKing(game, playedMove.move) || !game.isCheck())
     );
@@ -321,12 +322,13 @@ function classifyMoves(game, prevGame, moveEvaluations) {
         classification = "best";
         if (isGreatFind(prevGame, playedMove, bestMoves[1]))
             classification = "greatFind";
-        if (isBrilliant(game, playedMove, accuracy))
+        if (isBrilliant(game, playedMove, bestMoves[1], accuracy))
             classification = "brilliant";
         return classification;
     }
 
-    if (accuracy <= 70) return "blunder";
+    if (accuracy === 0) return "blunder";
+    if (accuracy <= 70 && isSacrifice(game, playedMove.move).sacrifice > 0) return "blunder";
     if (70 < accuracy && accuracy <= 90) {
         if (
             ["mistake", "blunder", "miss"].includes(

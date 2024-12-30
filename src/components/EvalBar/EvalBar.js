@@ -36,11 +36,11 @@ function EvalBar({ orientation, value, turn }) {
         >
             <div
                 className={`${styles.line} ` + (orientation === "white" ? styles.black : styles.white)}
-                style={{ height: `${100 - heightPercentage}%` }}
+                style={{ height: `${orientation === "white" ? 100 - heightPercentage : heightPercentage}%` }}
             />
             <div
                 className={`${styles.line} ` + (orientation === "white" ? styles.white : styles.black)}
-                style={{ height: `${heightPercentage}%` }}
+                style={{ height: `${orientation === "white" ? heightPercentage : 100 - heightPercentage}%` }}
             />
             {isHovered && (
                 <div
