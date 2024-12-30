@@ -329,7 +329,7 @@ function classifyMoves(game, prevGame, moveEvaluations) {
 
     if (accuracy === 0) return "blunder";
     if (accuracy <= 70 && isSacrifice(game, playedMove.move).sacrifice > 0) return "blunder";
-    if (70 < accuracy && accuracy <= 90) {
+    if (accuracy <= 90) {
         if (
             ["mistake", "blunder", "miss"].includes(
                 prevGame ? prevGame.playedMove.move.classification : null
@@ -346,20 +346,18 @@ function classifyMoves(game, prevGame, moveEvaluations) {
     if (accuracy > 80) {
         if (
             playedMove.scoreType !== "mate" &&
-            bestMoves[0].score >= 0.1 &&
-            Math.abs(playedMove.score) < 0.1
-        )
-            return "inaccuracy";
-        if (
-            playedMove.scoreType !== "mate" &&
-            Math.abs(bestMoves[0].score) < 0.1 &&
-            playedMove.score <= -0.1
-        )
-            return "inaccuracy";
-        if (accuracy > 90) return "excellent";
-        return "good";
+            bestMoves[0].score >= 1 &&
+            playedMove.score >= 1 ||
+            Math.abs(bestMoves[0].score) < 1 &&
+            Math.abs(playedMove.score) < 1 ||
+            bestMoves[0].score <= -1 &&
+            playedMove.score <= -1
+        ) {
+            if (accuracy > 90) return "excellent";
+            return "good";
+        }
     }
-    return "good";
+    return "inaccuracy";
 }
 
 function Analysis({ analysisHeight }) {
