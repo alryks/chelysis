@@ -351,7 +351,9 @@ function classifyMoves(game, prevGame, moveEvaluations) {
             Math.abs(bestMoves[0].score) < 1 &&
             Math.abs(playedMove.score) < 1 ||
             bestMoves[0].score <= -1 &&
-            playedMove.score <= -1
+            playedMove.score <= -1 ||
+            playedMove.scoreType === "mate" &&
+            bestMoves[0].scoreType === "mate"
         ) {
             if (accuracy > 90) return "excellent";
             return "good";
