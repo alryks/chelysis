@@ -64,6 +64,10 @@ function findOpening(fen) {
     return opening || null;
 }
 
+function calculateWinChance(score) {
+    return 100 / (1 + Math.exp(-score / Math.E));
+}
+
 function calculateAccuracy(bestEval, moveEval) {
     let value = null;
     if (bestEval.scoreType === "mate" && moveEval.scoreType === "mate") {
@@ -82,30 +86,17 @@ function calculateAccuracy(bestEval, moveEval) {
         value = 0;
     }
 
+    if (bestEval.move === moveEval.move) return 100;
+    if (bestEval.score < moveEval.score) return 100;
+
     if (value === null) {
-        return {
-            accuracy:
-                (100 /
-                    (1 +
-                        Math.pow(
-                            10 / Math.E,
-                            bestEval.score - moveEval.score
-                        ))) *
-                2,
-            classification:
-                (100 /
-                    (1 +
-                        Math.pow(
-                            Math.PI,
-                            (bestEval.score - moveEval.score) / Math.PI
-                        ))) *
-                2,
-        };
+        const winChanceBest = calculateWinChance(bestEval.score);
+        const winChanceMove = calculateWinChance(moveEval.score);
+        const accuracy =
+            100 * Math.exp(-(winChanceBest - winChanceMove) / Math.exp(2));
+        return accuracy;
     } else {
-        return {
-            accuracy: value,
-            classification: value,
-        };
+        return value;
     }
 }
 
@@ -115,58 +106,10 @@ const pieceCost = {
     b: 3,
     r: 5,
     q: 9,
-    k: 0,
+    k: Infinity,
 };
 
-function getAttackers(game) {
-    const attackers = {};
-    for (const attacker of game.moves({ verbose: true })) {
-        if (!attacker.captured) continue;
-        attackers[attacker.to] = attackers[attacker.to]
-            ? [...attackers[attacker.to], attacker]
-            : [attacker];
-    }
-    // sort each array in attackers by piece value
-    for (const square in attackers) {
-        attackers[square].sort((a, b) => {
-            return pieceCost[a.piece] - pieceCost[b.piece];
-        });
-    }
-    return attackers;
-}
-
-function getDefenders(game) {
-    const board = new Chess(game.fen());
-    const defenders = {};
-    for (const attacker of board.moves({ verbose: true })) {
-        if (!attacker.captured) continue;
-        board.move(attacker);
-        let moves = board
-            .moves({ verbose: true })
-            .filter((move) => move.to === attacker.to);
-        if (!defenders[attacker.to]) {
-            defenders[attacker.to] = moves;
-        } else {
-            // append only moves that are not already in defenders, check that comparing lan
-            moves = moves.filter(
-                (move) =>
-                    !defenders[attacker.to].some((m) => m.lan === move.lan)
-            );
-            defenders[attacker.to] = [...defenders[attacker.to], ...moves];
-        }
-        board.undo();
-    }
-    // sort each array in defenders by piece value
-    for (const square in defenders) {
-        defenders[square].sort((a, b) => {
-            return pieceCost[a.piece] - pieceCost[b.piece];
-        });
-    }
-    return defenders;
-}
-
-function isSacrifice(game, move) {
-
+function isSacrifice(game, move, excludeMove) {
     const board = new Chess(game.fen());
     const moveObj = {
         from: move.slice(0, 2),
@@ -180,71 +123,30 @@ function isSacrifice(game, move) {
     const targetPiece = board.get(moveObj.to);
     let defenderValue =
         targetPiece && targetPiece.type ? pieceCost[targetPiece.type] : 0;
-
+    if (moveObj.promotion) {
+        defenderValue += pieceCost[moveObj.promotion] - 1;
+    }
 
     board.move(moveObj);
 
-    const attackers = getAttackers(board);
-    const defenders = getDefenders(board);
-
     let pawnTaken = false;
-
-    for (const square in attackers) {
-        let lastPiece = board.get(square).type;
-
-        while (attackers[square].length > 0) {
-            if (
-                pieceCost[lastPiece] < pieceCost[attackers[square][0].piece] &&
-                defenders[square] &&
-                defenders[square].length > 0
-            ) {
-                break;
-            }
-            if (lastPiece === "p") pawnTaken = true;
-
-            attackerValue += pieceCost[lastPiece];
-            lastPiece = attackers[square].shift().piece;
-            if (attackers[square].length === 0) {
-                if (!defenders[square] || defenders[square].length === 0) {
-                    break;
-                }
-                if (lastPiece === "p") pawnTaken = true;
-
-                defenderValue += pieceCost[lastPiece];
-                break;
-            }
-            if (!defenders[square] || defenders[square].length === 0) {
-                break;
-            }
-            if (pieceCost[lastPiece] < pieceCost[defenders[square][0].piece]) {
-                break;
-            }
-            if (lastPiece === "p") pawnTaken = true;
-
-            defenderValue += pieceCost[lastPiece];
-            lastPiece = defenders[square].shift().piece;
-
-            if (!defenders[square] || defenders[square].length === 0) {
-                if (attackers[square].length === 0) {
-                    break;
-                }
-                if (lastPiece === "p") pawnTaken = true;
-
-                attackerValue += pieceCost[lastPiece];
-                lastPiece = attackers[square].shift().piece;
-            }
-            if (attackers[square].length === 0) {
-                break;
-            }
-            if (pieceCost[lastPiece] < pieceCost[attackers[square][0].piece]) {
-                break;
-            }
+    let pieceCaptured = targetPiece && targetPiece.type;
+    for (const move of board
+        .moves({ verbose: true })
+        .filter((mv) => mv.captured && mv.lan !== excludeMove)) {
+        board.move(move);
+        if (!board.moves({ verbose: true }).some((mv) => mv.to === move.to)) {
+            attackerValue = Math.max(attackerValue, pieceCost[move.captured]);
+            pieceCaptured = true;
+            if (move.captured === "p") pawnTaken = true;
         }
+        board.undo();
     }
 
     return {
         sacrifice: attackerValue - defenderValue,
         pawnTaken,
+        pieceCaptured,
     };
 }
 
@@ -256,40 +158,46 @@ function isKing(game, move) {
     return game.get(move.slice(0, 2)).type === "k";
 }
 
-function isBrilliant(game, playedMove, secondBestMove, accuracy) {
-    const { sacrifice, pawnTaken } = isSacrifice(game, playedMove.move);
+function isBrilliant(game, playedMove, secondBestMove) {
+    // TODO: identify middlegame and endgame
+    const { sacrifice, pawnTaken, pieceCaptured } = isSacrifice(game, playedMove.move);
     return (
-        accuracy > 90 &&
         sacrifice > 0 &&
         !pawnTaken &&
-        (playedMove.scoreType !== "mate" && playedMove.score >= -1 || playedMove.scoreType === "mate" && playedMove.score > 0) &&
-        (secondBestMove.scoreType !== "mate" && secondBestMove.score <= 1 || secondBestMove.scoreType === "mate" && secondBestMove.score < 0) &&
+        ((playedMove.scoreType !== "mate" && playedMove.score >= -2) ||
+            (playedMove.scoreType === "mate" && playedMove.score > 0)) &&
+        ((secondBestMove.scoreType !== "mate" && secondBestMove.score <= 4) ||
+            (secondBestMove.scoreType === "mate" &&
+                secondBestMove.score < 0)) &&
         !isPawn(game, playedMove.move) &&
         (!isKing(game, playedMove.move) || !game.isCheck())
     );
 }
 
-function isGreatFind(prevGame, playedMove, secondBestMove) {
-    if (prevGame && isSacrifice(new Chess(prevGame.fen), prevGame.playedMove.move.move).sacrifice >= 0)
-        return false;
+function isGreatFind(prevGame, game, playedMove, secondBestMove) {
+    // check for trades
+    if (prevGame) {
+        const {sacrifice, pawnTaken, pieceCaptured} = isSacrifice(new Chess(prevGame.fen), prevGame.playedMove.move.move, playedMove.move)
+        if (sacrifice < 0 && pieceCaptured) return false;
+    }
+    const {sacrifice, pawnTaken, pieceCaptured} = isSacrifice(new Chess(game.fen()), playedMove.move)
+    if (sacrifice <= 0 && pieceCaptured) return false;
+
     if (playedMove.scoreType !== "mate") {
-        if (secondBestMove.scoreType === "mate")
+        if (secondBestMove.scoreType === "mate") return true;
+        if (
+            (playedMove.score > 2 && secondBestMove.score <= 2) ||
+            (playedMove.score > -2 && secondBestMove.score <= -2)
+        )
             return true;
-        if ((playedMove.score > 1 && secondBestMove.score <= 1) || (playedMove.score > -1 && secondBestMove.score <= -1))
-            return true;
-    }
-    else if (playedMove.score > 0) {
+    } else if (playedMove.score > 0) {
         if (secondBestMove.scoreType === "mate") {
-            if (secondBestMove.score > 0)
-                return false;
-            else
-                return true;
-        }
-        else {
+            if (secondBestMove.score > 0) return false;
+            else return true;
+        } else {
             return true;
         }
-    }
-    else {
+    } else {
         return false;
     }
 }
@@ -315,47 +223,48 @@ function classifyMoves(game, prevGame, moveEvaluations) {
 
     if (bestMoves.length === 1) return "forced";
 
-    const accuracy = calculateAccuracy(bestMoves[0], playedMove).classification;
+    const accuracy = calculateAccuracy(bestMoves[0], playedMove);
 
     let classification = null;
     if (bestMoves[0].move === playedMove.move) {
         classification = "best";
-        if (isGreatFind(prevGame, playedMove, bestMoves[1]))
+        if (isGreatFind(prevGame, game, playedMove, bestMoves[1]))
             classification = "greatFind";
-        if (isBrilliant(game, playedMove, bestMoves[1], accuracy))
+        if (isBrilliant(game, playedMove, bestMoves[1]))
             classification = "brilliant";
         return classification;
     }
 
-    if (accuracy === 0) return "blunder";
-    if (accuracy <= 70 && isSacrifice(game, playedMove.move).sacrifice > 0) return "blunder";
-    if (accuracy <= 90) {
-        if (
-            ["mistake", "blunder", "miss"].includes(
-                prevGame ? prevGame.playedMove.move.classification : null
-            )
+    if (
+        accuracy <= 60 &&
+        ["mistake", "blunder", "miss"].includes(
+            prevGame ? prevGame.playedMove.move.classification : null
         )
-            return "miss";
+    )
+        return "miss";
+
+    if (accuracy <= 20) return "blunder";
+
+    if (
+        accuracy <= 60 &&
+        playedMove.scoreType !== "mate" &&
+        (bestMoves[0].score >= 0.5 && playedMove.score < 0.5 ||
+        bestMoves[0].score >= -0.5 && playedMove.score < -0.5)
+    )
+        return "mistake";
+
+    if (accuracy > 60) {
         if (
-            playedMove.scoreType !== "mate" &&
-            bestMoves[0].score >= 0.1 &&
-            playedMove.score <= -0.1
-        )
-            return "mistake";
-    }
-    if (accuracy > 80) {
-        if (
-            playedMove.scoreType !== "mate" &&
-            bestMoves[0].score >= 1 &&
-            playedMove.score >= 1 ||
-            Math.abs(bestMoves[0].score) < 1 &&
-            Math.abs(playedMove.score) < 1 ||
-            bestMoves[0].score <= -1 &&
-            playedMove.score <= -1 ||
-            playedMove.scoreType === "mate" &&
-            bestMoves[0].scoreType === "mate"
+            (playedMove.scoreType !== "mate" &&
+                bestMoves[0].score >= 1 &&
+                playedMove.score >= 1) ||
+            (Math.abs(bestMoves[0].score) < 1 &&
+                Math.abs(playedMove.score) < 1) ||
+            (bestMoves[0].score <= -1 && playedMove.score <= -1) ||
+            (playedMove.scoreType === "mate" &&
+                bestMoves[0].scoreType === "mate")
         ) {
-            if (accuracy > 90) return "excellent";
+            if (accuracy > 85) return "excellent";
             return "good";
         }
     }
@@ -545,11 +454,13 @@ function Analysis({ analysisHeight }) {
         const blackAccuracies = [];
 
         for (let i = 0; i < game.length - 1; i++) {
+            if (game[i].playedMove.move.classification === "book") continue;
+
             const accuracy = calculateAccuracy(
                 game[i].bestMoves.moves[0],
                 game[i].playedMove.move
-            ).accuracy;
-            if (!accuracy) continue;
+            );
+
             if (i % 2 === 0) {
                 whiteAccuracies.push(accuracy);
             } else {
@@ -561,12 +472,12 @@ function Analysis({ analysisHeight }) {
             whiteAccuracies.length > 0
                 ? whiteAccuracies.reduce((a, b) => a + b, 0) /
                   whiteAccuracies.length
-                : 0;
+                : 100;
         const blackAccuracy =
             blackAccuracies.length > 0
                 ? blackAccuracies.reduce((a, b) => a + b, 0) /
                   blackAccuracies.length
-                : 0;
+                : 100;
         return { whiteAccuracy, blackAccuracy };
     };
 
