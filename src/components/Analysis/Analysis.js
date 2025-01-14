@@ -109,6 +109,88 @@ const pieceCost = {
     k: Infinity,
 };
 
+function getFirstLegalMove(game, moves) {
+    for (const move of moves) {
+        try {
+            game.move(move);
+            return move;
+        } catch (e) {
+            continue;
+        }
+    }
+    return null;
+}
+
+function getAttackersDefenders(game, excludeMove) {
+    let board = new Chess(game.fen());
+    const attackers = {};
+    const defenders = {};
+    
+    let isAdded = true;
+    let firstCheck = true;
+    while (isAdded) {
+        isAdded = false;
+        for (const move of board.moves({ verbose: true })) {
+            if (!move.captured) continue;
+            if (!firstCheck && attackers[move.to] === undefined) continue;
+            if (move.lan === excludeMove) continue;
+
+            attackers[move.to] = attackers[move.to] ? [...attackers[move.to], move] : [move];
+            board.remove(move.from);
+
+            isAdded = true;
+        }
+        firstCheck = false;
+    }
+
+    board = new Chess(game.fen());
+    isAdded = true;
+    while (isAdded) {
+        isAdded = false;
+        const deleteSquares = [];
+        for (const square in attackers) {
+            const usedMove = getFirstLegalMove(board, attackers[square]);
+            if (!usedMove) continue;
+
+            let moves = board
+            .moves({ verbose: true })
+            .filter((move) => move.to === usedMove.to);
+            if (!defenders[usedMove.to]) {
+                defenders[usedMove.to] = moves;
+            } else {
+                // append only moves that are not already in defenders, check that comparing lan
+                moves = moves.filter(
+                    (move) =>
+                        !defenders[usedMove.to].some((m) => m.lan === move.lan)
+                );
+                defenders[usedMove.to].push(...moves);
+            }
+            board.undo();
+            moves.forEach((move) => {
+                deleteSquares.push(move.from);
+            });
+            isAdded = moves.length > 0;
+        }
+        deleteSquares.forEach((square) => {
+            board.remove(square);
+        });
+    }
+
+    for (const square in attackers) {
+        attackers[square].sort((a, b) => {
+            return pieceCost[a.piece] - pieceCost[b.piece];
+        });
+    }
+
+    for (const square in defenders) {
+        defenders[square].sort((a, b) => {
+            return pieceCost[a.piece] - pieceCost[b.piece];
+        });
+    }
+
+    return {attackers, defenders};
+}
+
 function isSacrifice(game, move, excludeMove) {
     const board = new Chess(game.fen());
     const moveObj = {
@@ -129,19 +211,66 @@ function isSacrifice(game, move, excludeMove) {
 
     board.move(moveObj);
 
+    const {attackers, defenders} = getAttackersDefenders(board, excludeMove);
+    // console.log(move, JSON.parse(JSON.stringify(attackers)), JSON.parse(JSON.stringify(defenders)));
+
     let pawnTaken = false;
     let pieceCaptured = targetPiece && targetPiece.type;
-    for (const move of board
-        .moves({ verbose: true })
-        .filter((mv) => mv.captured && mv.lan !== excludeMove)) {
-        board.move(move);
-        if (!board.moves({ verbose: true }).some((mv) => mv.to === move.to)) {
-            attackerValue = Math.max(attackerValue, pieceCost[move.captured]);
+
+    for (const square in attackers) {
+        let lastPiece = board.get(square).type;
+
+        while (attackers[square].length > 0) {
+            if (
+                pieceCost[lastPiece] < pieceCost[attackers[square][0].piece] &&
+                defenders[square] &&
+                defenders[square].length > 0
+            ) {
+                break;
+            }
             pieceCaptured = true;
-            if (move.captured === "p") pawnTaken = true;
+            if (lastPiece === "p") pawnTaken = true;
+
+            attackerValue += pieceCost[lastPiece];
+            lastPiece = attackers[square].shift().piece;
+            if (attackers[square].length === 0) {
+                if (!defenders[square] || defenders[square].length === 0) {
+                    break;
+                }
+                if (lastPiece === "p") pawnTaken = true;
+
+                defenderValue += pieceCost[lastPiece];
+                break;
+            }
+            if (!defenders[square] || defenders[square].length === 0) {
+                break;
+            }
+            if (pieceCost[lastPiece] < pieceCost[defenders[square][0].piece]) {
+                break;
+            }
+            if (lastPiece === "p") pawnTaken = true;
+
+            defenderValue += pieceCost[lastPiece];
+            lastPiece = defenders[square].shift().piece;
+
+            if (!defenders[square] || defenders[square].length === 0) {
+                if (attackers[square].length === 0) {
+                    break;
+                }
+                if (lastPiece === "p") pawnTaken = true;
+
+                attackerValue += pieceCost[lastPiece];
+                lastPiece = attackers[square].shift().piece;
+            }
+            if (attackers[square].length === 0) {
+                break;
+            }
+            if (pieceCost[lastPiece] < pieceCost[attackers[square][0].piece]) {
+                break;
+            }
         }
-        board.undo();
     }
+    // console.log(attackerValue, defenderValue);
 
     return {
         sacrifice: attackerValue - defenderValue,
