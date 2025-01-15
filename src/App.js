@@ -27,7 +27,6 @@ function App() {
     const boardOrientation = useSelector(
         (state) => state.game.boardOrientation
     );
-    const boardWidth = useSelector((state) => state.game.boardWidth);
     const contentRef = useRef(null);
 
     const stockfishOn = useSelector((state) => state.analysis.stockfishOn);
@@ -70,7 +69,7 @@ function App() {
         return () => {
             window.removeEventListener('resize', handleResize);
         };
-    }, []);
+    }, [handleResize]);
 
     useEffect(() => {
         handleResize();

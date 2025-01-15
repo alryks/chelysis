@@ -109,174 +109,95 @@ const pieceCost = {
     k: Infinity,
 };
 
-function getFirstLegalMove(game, moves) {
+function lanToMove(game, lan) {
+    const moves = game.moves({ verbose: true });
     for (const move of moves) {
-        try {
-            game.move(move);
-            return move;
-        } catch (e) {
-            continue;
-        }
+        if (move.lan === lan) return move;
     }
     return null;
 }
 
-function getAttackersDefenders(game, excludeMove) {
-    let board = new Chess(game.fen());
-    const attackers = {};
-    const defenders = {};
-    
-    let isAdded = true;
-    let firstCheck = true;
-    while (isAdded) {
-        isAdded = false;
-        for (const move of board.moves({ verbose: true })) {
-            if (!move.captured) continue;
-            if (!firstCheck && attackers[move.to] === undefined) continue;
-            if (move.lan === excludeMove) continue;
-
-            attackers[move.to] = attackers[move.to] ? [...attackers[move.to], move] : [move];
-            board.remove(move.from);
-
-            isAdded = true;
-        }
-        firstCheck = false;
+function getCaptureTree(game, move, value = 0, squares, alpha = -Infinity, beta = -Infinity, depth = 0) {
+    const board = new Chess(game.fen());
+    if (value !== 0) {
+        value = -value;
     }
 
-    board = new Chess(game.fen());
-    isAdded = true;
-    while (isAdded) {
-        isAdded = false;
-        const deleteSquares = [];
-        for (const square in attackers) {
-            const usedMove = getFirstLegalMove(board, attackers[square]);
-            if (!usedMove) continue;
+    let moves = [];
+    if (move) {
+        board.move(move);
 
-            let moves = board
-            .moves({ verbose: true })
-            .filter((move) => move.to === usedMove.to);
-            if (!defenders[usedMove.to]) {
-                defenders[usedMove.to] = moves;
-            } else {
-                // append only moves that are not already in defenders, check that comparing lan
-                moves = moves.filter(
-                    (move) =>
-                        !defenders[usedMove.to].some((m) => m.lan === move.lan)
-                );
-                defenders[usedMove.to].push(...moves);
+        if (!squares) {
+            const firstMoves = board.moves({ verbose: true }).filter((mv) => mv.captured);
+            squares = new Set(firstMoves.map((mv) => mv.to));
+            for (const mv of firstMoves) {
+                board.move(mv);
+                const secondMoves = board.moves({ verbose: true }).filter((mv) => mv.captured);
+                for (const m of secondMoves) {
+                    squares.add(m.to);
+                }
+                board.undo();
             }
-            board.undo();
-            moves.forEach((move) => {
-                deleteSquares.push(move.from);
-            });
-            isAdded = moves.length > 0;
         }
-        deleteSquares.forEach((square) => {
-            board.remove(square);
-        });
+
+        if (move.captured) {
+            value += pieceCost[move.captured];
+        }
+        if (move.promotion) {
+            value += pieceCost[move.promotion] - 1;
+        }
+
+        moves = board.moves({ verbose: true }).filter((mv) => mv.captured && squares.has(mv.to));
+        if (moves.length < board.moves().length && moves.length !== 0) {
+            moves.push(null);
+            if (value < 0 || depth === 12) moves = [];
+        }
+    }
+    
+    let bestValue = -Infinity;
+    let bestMove = -1;
+
+    const children = [];
+    for (const [i, mv] of moves.entries()) {
+        const tree = getCaptureTree(board, mv, value, squares ? squares : moves.filter((m) => m !== null).map((m) => m.to), beta, alpha, depth + 1);
+        if (-tree.bestValue > bestValue || (-tree.bestValue === bestValue && mv === null)) {
+            bestValue = tree.bestValue === 0 ? 0 : -tree.bestValue;
+            bestMove = i;
+        }
+        children.push(tree);
+
+        alpha = Math.max(alpha, bestValue);
+        if (alpha >= -beta) break;
     }
 
-    for (const square in attackers) {
-        attackers[square].sort((a, b) => {
-            return pieceCost[a.piece] - pieceCost[b.piece];
-        });
-    }
+    if (bestMove === -1) bestValue = value === 0 ? 0 : -value;
 
-    for (const square in defenders) {
-        defenders[square].sort((a, b) => {
-            return pieceCost[a.piece] - pieceCost[b.piece];
-        });
-    }
-
-    return {attackers, defenders};
+    return { value, move, children, bestValue, bestMove };
 }
 
-function isSacrifice(game, move, excludeMove) {
-    const board = new Chess(game.fen());
-    const moveObj = {
-        from: move.slice(0, 2),
-        to: move.slice(2, 4),
-    };
-    if (move.length > 4) {
-        moveObj.promotion = move[4];
-    }
-
-    let attackerValue = 0;
-    const targetPiece = board.get(moveObj.to);
-    let defenderValue =
-        targetPiece && targetPiece.type ? pieceCost[targetPiece.type] : 0;
-    if (moveObj.promotion) {
-        defenderValue += pieceCost[moveObj.promotion] - 1;
-    }
-
-    board.move(moveObj);
-
-    const {attackers, defenders} = getAttackersDefenders(board, excludeMove);
-    // console.log(move, JSON.parse(JSON.stringify(attackers)), JSON.parse(JSON.stringify(defenders)));
+function isSacrifice(game, move, captureTree) {
+    const moveObj = lanToMove(game, move);
 
     let pawnTaken = false;
-    let pieceCaptured = targetPiece && targetPiece.type;
-
-    for (const square in attackers) {
-        let lastPiece = board.get(square).type;
-
-        while (attackers[square].length > 0) {
-            if (
-                pieceCost[lastPiece] < pieceCost[attackers[square][0].piece] &&
-                defenders[square] &&
-                defenders[square].length > 0
-            ) {
-                break;
-            }
+    let pieceCaptured = moveObj.captured !== undefined;
+    
+    let subTree = captureTree;
+    let depth = 0;
+    do {
+        if (subTree.move && subTree.move.captured) {
             pieceCaptured = true;
-            if (lastPiece === "p") pawnTaken = true;
-
-            attackerValue += pieceCost[lastPiece];
-            lastPiece = attackers[square].shift().piece;
-            if (attackers[square].length === 0) {
-                if (!defenders[square] || defenders[square].length === 0) {
-                    break;
-                }
-                if (lastPiece === "p") pawnTaken = true;
-
-                defenderValue += pieceCost[lastPiece];
-                break;
-            }
-            if (!defenders[square] || defenders[square].length === 0) {
-                break;
-            }
-            if (pieceCost[lastPiece] < pieceCost[defenders[square][0].piece]) {
-                break;
-            }
-            if (lastPiece === "p") pawnTaken = true;
-
-            defenderValue += pieceCost[lastPiece];
-            lastPiece = defenders[square].shift().piece;
-
-            if (!defenders[square] || defenders[square].length === 0) {
-                if (attackers[square].length === 0) {
-                    break;
-                }
-                if (lastPiece === "p") pawnTaken = true;
-
-                attackerValue += pieceCost[lastPiece];
-                lastPiece = attackers[square].shift().piece;
-            }
-            if (attackers[square].length === 0) {
-                break;
-            }
-            if (pieceCost[lastPiece] < pieceCost[attackers[square][0].piece]) {
-                break;
-            }
+            if ((depth % 2 === 1) && (subTree.move.captured === "p")) pawnTaken = true;
         }
-    }
-    // console.log(attackerValue, defenderValue);
+        if (subTree.bestMove === -1) break;
+        subTree = subTree.children[subTree.bestMove];
+        depth++;
+    } while (true)
 
     return {
-        sacrifice: attackerValue - defenderValue,
+        sacrifice: captureTree.bestValue,
         pawnTaken,
         pieceCaptured,
-    };
+    }
 }
 
 function isPawn(game, move) {
@@ -287,9 +208,10 @@ function isKing(game, move) {
     return game.get(move.slice(0, 2)).type === "k";
 }
 
-function isBrilliant(game, playedMove, secondBestMove) {
+function isBrilliant(game, playedMove, secondBestMove, captureTree) {
     // TODO: identify middlegame and endgame
-    const { sacrifice, pawnTaken, pieceCaptured } = isSacrifice(game, playedMove.move);
+    const { sacrifice, pawnTaken, pieceCaptured } = isSacrifice(game, playedMove.move, captureTree);
+    // console.log(playedMove.move, captureTree)
     return (
         sacrifice > 0 &&
         !pawnTaken &&
@@ -303,13 +225,9 @@ function isBrilliant(game, playedMove, secondBestMove) {
     );
 }
 
-function isGreatFind(prevGame, game, playedMove, secondBestMove) {
+function isGreatFind(prevGame, game, playedMove, secondBestMove, captureTree) {
     // check for trades
-    if (prevGame) {
-        const {sacrifice, pawnTaken, pieceCaptured} = isSacrifice(new Chess(prevGame.fen), prevGame.playedMove.move.move, playedMove.move)
-        if (sacrifice < 0 && pieceCaptured) return false;
-    }
-    const {sacrifice, pawnTaken, pieceCaptured} = isSacrifice(new Chess(game.fen()), playedMove.move)
+    const {sacrifice, pawnTaken, pieceCaptured} = isSacrifice(game, playedMove.move, captureTree)
     if (sacrifice <= 0 && pieceCaptured) return false;
 
     if (playedMove.scoreType !== "mate") {
@@ -337,13 +255,8 @@ function classifyMoves(game, prevGame, moveEvaluations) {
 
     if (bestMoves.length === 0) return null;
 
-    const moveObj = {
-        from: playedMove.move.slice(0, 2),
-        to: playedMove.move.slice(2, 4),
-    };
-    if (playedMove.move.length > 4) {
-        moveObj.promotion = playedMove.move[4];
-    }
+    const moveObj = lanToMove(game, playedMove.move);
+
     game.move(moveObj);
     if (findOpening(game.fen())) {
         return "book";
@@ -357,9 +270,10 @@ function classifyMoves(game, prevGame, moveEvaluations) {
     let classification = null;
     if (bestMoves[0].move === playedMove.move) {
         classification = "best";
-        if (isGreatFind(prevGame, game, playedMove, bestMoves[1]))
+        const captureTree = getCaptureTree(game, moveObj);
+        if (isGreatFind(prevGame, game, playedMove, bestMoves[1], captureTree))
             classification = "greatFind";
-        if (isBrilliant(game, playedMove, bestMoves[1]))
+        if (isBrilliant(game, playedMove, bestMoves[1], captureTree))
             classification = "brilliant";
         return classification;
     }
