@@ -117,7 +117,15 @@ function lanToMove(game, lan) {
     return null;
 }
 
-function getCaptureTree(game, move, value = 0, squares, alpha = -Infinity, beta = -Infinity, depth = 0) {
+function getCaptureTree(
+    game,
+    move,
+    value = 0,
+    squares,
+    alpha = -Infinity,
+    beta = -Infinity,
+    depth = 0
+) {
     const board = new Chess(game.fen());
     if (value !== 0) {
         value = -value;
@@ -128,11 +136,15 @@ function getCaptureTree(game, move, value = 0, squares, alpha = -Infinity, beta 
         board.move(move);
 
         if (!squares) {
-            const firstMoves = board.moves({ verbose: true }).filter((mv) => mv.captured);
+            const firstMoves = board
+                .moves({ verbose: true })
+                .filter((mv) => mv.captured);
             squares = new Set(firstMoves.map((mv) => mv.to));
             for (const mv of firstMoves) {
                 board.move(mv);
-                const secondMoves = board.moves({ verbose: true }).filter((mv) => mv.captured);
+                const secondMoves = board
+                    .moves({ verbose: true })
+                    .filter((mv) => mv.captured);
                 for (const m of secondMoves) {
                     squares.add(m.to);
                 }
@@ -147,20 +159,35 @@ function getCaptureTree(game, move, value = 0, squares, alpha = -Infinity, beta 
             value += pieceCost[move.promotion] - 1;
         }
 
-        moves = board.moves({ verbose: true }).filter((mv) => mv.captured && squares.has(mv.to));
+        moves = board
+            .moves({ verbose: true })
+            .filter((mv) => mv.captured && squares.has(mv.to));
         if (moves.length < board.moves().length && moves.length !== 0) {
             moves.push(null);
             if (value < 0 || depth === 12) moves = [];
         }
     }
-    
+
     let bestValue = -Infinity;
     let bestMove = -1;
 
     const children = [];
     for (const [i, mv] of moves.entries()) {
-        const tree = getCaptureTree(board, mv, value, squares ? squares : moves.filter((m) => m !== null).map((m) => m.to), beta, alpha, depth + 1);
-        if (-tree.bestValue > bestValue || (-tree.bestValue === bestValue && mv === null)) {
+        const tree = getCaptureTree(
+            board,
+            mv,
+            value,
+            squares
+                ? squares
+                : moves.filter((m) => m !== null).map((m) => m.to),
+            beta,
+            alpha,
+            depth + 1
+        );
+        if (
+            -tree.bestValue > bestValue ||
+            (-tree.bestValue === bestValue && mv === null)
+        ) {
             bestValue = tree.bestValue === 0 ? 0 : -tree.bestValue;
             bestMove = i;
         }
@@ -180,24 +207,25 @@ function isSacrifice(game, move, captureTree) {
 
     let pawnTaken = false;
     let pieceCaptured = moveObj.captured !== undefined;
-    
+
     let subTree = captureTree;
     let depth = 0;
     do {
         if (subTree.move && subTree.move.captured) {
             pieceCaptured = true;
-            if ((depth % 2 === 1) && (subTree.move.captured === "p")) pawnTaken = true;
+            if (depth % 2 === 1 && subTree.move.captured === "p")
+                pawnTaken = true;
         }
         if (subTree.bestMove === -1) break;
         subTree = subTree.children[subTree.bestMove];
         depth++;
-    } while (true)
+    } while (true);
 
     return {
         sacrifice: captureTree.bestValue,
         pawnTaken,
         pieceCaptured,
-    }
+    };
 }
 
 function isPawn(game, move) {
@@ -210,14 +238,20 @@ function isKing(game, move) {
 
 function isBrilliant(game, playedMove, secondBestMove, captureTree) {
     // TODO: identify middlegame and endgame
-    const { sacrifice, pawnTaken, pieceCaptured } = isSacrifice(game, playedMove.move, captureTree);
+    const { sacrifice, pawnTaken, pieceCaptured } = isSacrifice(
+        game,
+        playedMove.move,
+        captureTree
+    );
     // console.log(playedMove.move, captureTree)
     return (
         sacrifice > 0 &&
         !pawnTaken &&
-        ((playedMove.scoreType !== "mate" && playedMove.score >= -2) ||
+        ((playedMove.scoreType !== "mate" &&
+            calculateWinChance(playedMove.score) > 30) ||
             (playedMove.scoreType === "mate" && playedMove.score > 0)) &&
-        ((secondBestMove.scoreType !== "mate" && secondBestMove.score <= 4) ||
+        ((secondBestMove.scoreType !== "mate" &&
+            calculateWinChance(secondBestMove.score) <= 85) ||
             (secondBestMove.scoreType === "mate" &&
                 secondBestMove.score < 0)) &&
         !isPawn(game, playedMove.move) &&
@@ -227,14 +261,20 @@ function isBrilliant(game, playedMove, secondBestMove, captureTree) {
 
 function isGreatFind(prevGame, game, playedMove, secondBestMove, captureTree) {
     // check for trades
-    const {sacrifice, pawnTaken, pieceCaptured} = isSacrifice(game, playedMove.move, captureTree)
+    const { sacrifice, pawnTaken, pieceCaptured } = isSacrifice(
+        game,
+        playedMove.move,
+        captureTree
+    );
     if (sacrifice <= 0 && pieceCaptured) return false;
 
     if (playedMove.scoreType !== "mate") {
         if (secondBestMove.scoreType === "mate") return true;
         if (
-            (playedMove.score > 2 && secondBestMove.score <= 2) ||
-            (playedMove.score > -2 && secondBestMove.score <= -2)
+            (calculateWinChance(playedMove.score) > 70 &&
+                calculateWinChance(secondBestMove.score) <= 70) ||
+            (calculateWinChance(playedMove.score) > 30 &&
+                calculateWinChance(secondBestMove.score) <= 30)
         )
             return true;
     } else if (playedMove.score > 0) {
@@ -278,36 +318,37 @@ function classifyMoves(game, prevGame, moveEvaluations) {
         return classification;
     }
 
-    if (
-        accuracy <= 60 &&
-        ["mistake", "blunder", "miss"].includes(
-            prevGame ? prevGame.playedMove.move.classification : null
+    if (accuracy <= 65) {
+        if (
+            ["mistake", "blunder", "miss"].includes(
+                prevGame ? prevGame.playedMove.move.classification : null
+            )
         )
-    )
-        return "miss";
+            return "miss";
+        if (accuracy <= 20) return "blunder";
+        if (
+            playedMove.scoreType !== "mate" &&
+            Math.max(
+                0,
+                calculateWinChance(bestMoves[0].score) -
+                    calculateWinChance(playedMove.score)
+            ) > 7
+        )
+            return "mistake";
+    }
 
-    if (accuracy <= 20) return "blunder";
-
-    if (
-        accuracy <= 60 &&
-        playedMove.scoreType !== "mate" &&
-        (bestMoves[0].score >= 0.5 && playedMove.score < 0.5 ||
-        bestMoves[0].score >= -0.5 && playedMove.score < -0.5)
-    )
-        return "mistake";
-
-    if (accuracy > 60) {
+    if (accuracy > 65) {
         if (
             (playedMove.scoreType !== "mate" &&
-                bestMoves[0].score >= 1 &&
-                playedMove.score >= 1) ||
-            (Math.abs(bestMoves[0].score) < 1 &&
-                Math.abs(playedMove.score) < 1) ||
-            (bestMoves[0].score <= -1 && playedMove.score <= -1) ||
-            (playedMove.scoreType === "mate" &&
-                bestMoves[0].scoreType === "mate")
+                Math.max(
+                    0,
+                    calculateWinChance(bestMoves[0].score) -
+                        calculateWinChance(playedMove.score)
+                ) <= 10) ||
+            (bestMoves[0].scoreType === "mate" &&
+                playedMove.scoreType === "mate")
         ) {
-            if (accuracy > 85) return "excellent";
+            if (accuracy > 90) return "excellent";
             return "good";
         }
     }
