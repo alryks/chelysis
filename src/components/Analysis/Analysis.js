@@ -254,7 +254,7 @@ function isBrilliant(game, playedMove, secondBestMove, captureTree) {
             calculateWinChance(secondBestMove.score) <= 85) ||
             (secondBestMove.scoreType === "mate" &&
                 secondBestMove.score < 0)) &&
-        !isPawn(game, playedMove.move) &&
+        // !isPawn(game, playedMove.move) &&
         (!isKing(game, playedMove.move) || !game.isCheck())
     );
 }
@@ -311,10 +311,10 @@ function classifyMoves(game, prevGame, moveEvaluations) {
     if (bestMoves[0].move === playedMove.move) {
         classification = "best";
         const captureTree = getCaptureTree(game, moveObj);
-        if (isGreatFind(prevGame, game, playedMove, bestMoves[1], captureTree))
-            classification = "greatFind";
         if (isBrilliant(game, playedMove, bestMoves[1], captureTree))
             classification = "brilliant";
+        if (isGreatFind(prevGame, game, playedMove, bestMoves[1], captureTree))
+            classification = "greatFind";
         return classification;
     }
 
