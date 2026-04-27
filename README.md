@@ -1,4 +1,4 @@
-# Chelysis Frontend
+# Chelysis
 
 Chelysis is a React chess analysis interface with board navigation, move analysis, an evaluation bar, and bundled Stockfish assets.
 
