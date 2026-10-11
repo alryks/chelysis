@@ -4,7 +4,6 @@ services:
     ports:
       - "127.0.0.1:${CHELYSIS_PORT:-3000}:80"
     restart: unless-stopped
-    mem_limit: 256m
     logging:
       driver: json-file
       options:
