@@ -86,6 +86,16 @@ tailnet. Serve's background configuration persists across reboots. Docker and
 Tailscale must both be enabled as system services; no graphical login is needed.
 This does not publish the application to the public Internet.
 
+If HTTPS Serve is not enabled in the tailnet, use private HTTP Serve instead:
+
+```sh
+sudo tailscale serve --bg --http=80 http://127.0.0.1:3000
+```
+
+Open the HTTP URL reported by `tailscale serve status`. Traffic between devices
+still uses Tailscale's encrypted network, but the page is not an HTTPS secure
+context for browser features that require one.
+
 ## Scripts
 
 ```sh
