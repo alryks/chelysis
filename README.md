@@ -68,6 +68,24 @@ docker run --rm -p 3000:80 chelysis-frontend
 
 The container builds the React app and serves the static output with nginx.
 
+### Private Fedora deployment
+
+Keep the deployment checkout at `/opt/chelysis` on the SSD. Compose binds
+port 3000 to localhost; override it with `CHELYSIS_PORT` if necessary.
+The container restarts after Docker or the host restarts, unless manually stopped.
+
+```sh
+cd /opt/chelysis
+sudo docker compose up --build -d
+sudo tailscale serve --bg http://127.0.0.1:3000
+sudo tailscale serve status
+```
+
+Open the HTTPS URL reported by Tailscale Serve from a device connected to your
+tailnet. Serve's background configuration persists across reboots. Docker and
+Tailscale must both be enabled as system services; no graphical login is needed.
+This does not publish the application to the public Internet.
+
 ## Scripts
 
 ```sh

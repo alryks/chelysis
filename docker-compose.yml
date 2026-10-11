@@ -2,5 +2,11 @@ services:
   frontend:
     build: .
     ports:
-      - "3000:80"
+      - "127.0.0.1:${CHELYSIS_PORT:-3000}:80"
     restart: unless-stopped
+    mem_limit: 256m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
