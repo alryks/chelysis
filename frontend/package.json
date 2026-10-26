@@ -1,0 +1,40 @@
+{
+  "name": "@chelysis/frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "bun scripts/prepare-engine.ts && bun --bun next dev --hostname 0.0.0.0",
+    "build": "bun scripts/prepare-engine.ts && bun --bun next build",
+    "start": "bun --bun next start --hostname 0.0.0.0",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@chelysis/chess": "workspace:*",
+    "@tabler/icons-react": "^3.49.0",
+    "chess.js": "1.4.0",
+    "next": "16.4.2",
+    "react": "19.3.0",
+    "react-chessboard": "5.12.1",
+    "react-dom": "19.3.0",
+    "stockfish": "19.0.1"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.3",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.2",
+    "typescript": "^5"
+  },
+  "packageManager": "bun@1.3.14",
+  "ignoreScripts": [
+    "sharp",
+    "unrs-resolver"
+  ],
+  "trustedDependencies": [
+    "sharp",
+    "unrs-resolver"
+  ]
+}

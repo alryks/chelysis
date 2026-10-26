@@ -1,0 +1,9 @@
+node_modules/
+.next/
+out/
+.env*
+*.tsbuildinfo
+next-env.d.ts
+public/stockfish/
+playwright-report/
+test-results/

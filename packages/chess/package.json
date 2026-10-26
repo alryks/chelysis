@@ -1,0 +1,12 @@
+{
+  "name": "@chelysis/chess",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "chess.js": "1.4.0"
+  }
+}

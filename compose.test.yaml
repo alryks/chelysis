@@ -1,0 +1,7 @@
+name: chelysis-test
+services:
+  tests:
+    build:
+      context: .
+      target: test
+    init: true

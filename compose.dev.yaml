@@ -1,0 +1,14 @@
+name: chelysis-dev
+services:
+  frontend:
+    build:
+      context: .
+      target: development
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./frontend/src:/app/frontend/src
+      - ./frontend/public/brand:/app/frontend/public/brand
+      - ./frontend/public/classification:/app/frontend/public/classification
+      - ./packages/chess/src:/app/packages/chess/src
+    init: true
