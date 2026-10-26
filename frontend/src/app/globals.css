@@ -555,6 +555,12 @@ textarea::placeholder {
 .board-settings input[type="range"]::-moz-range-progress {
   background: var(--accent);
 }
+.engine-label {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 10px;
+  text-align: center;
+}
 .keyboard-hint {
   display: flex;
   justify-content: flex-start;

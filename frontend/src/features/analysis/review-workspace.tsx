@@ -19,6 +19,7 @@ import {
   importPgn,
 } from "@chelysis/chess";
 import type { Square } from "chess.js";
+import { ENGINE_NAME } from "@/lib/engine/stockfish";
 import { useReview } from "./use-review";
 import { classificationDisplay } from "./classifications";
 import { EvaluationBar } from "./evaluation-bar";
@@ -29,7 +30,8 @@ const Board = dynamic(() => import("./board"), {
 const sample = "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 *";
 
 export default function ReviewWorkspace() {
-  const { state, dispatch, error, setError, displayEvaluation } = useReview();
+  const { state, dispatch, engineReady, error, setError, displayEvaluation } =
+    useReview();
   const [pgn, setPgn] = useState("");
   const [orientation, setOrientation] = useState<"white" | "black">("white");
   const [arrowCount, setArrowCount] = useState(2);
@@ -408,6 +410,9 @@ export default function ReviewWorkspace() {
                 onChange={(event) => setArrowCount(Number(event.target.value))}
               />
             </div>
+            <p className="engine-label" role="status">
+              {engineReady ? ENGINE_NAME : "Loading engine…"}
+            </p>
           </div>
         </aside>
       </div>
