@@ -410,7 +410,7 @@ export default function ReviewWorkspace() {
                 onChange={(event) => setArrowCount(Number(event.target.value))}
               />
             </div>
-            <p className="engine-label" role="status">
+            <p className="engine-label" role="status" data-ready={engineReady}>
               {engineReady ? ENGINE_NAME : "Loading engine…"}
             </p>
           </div>

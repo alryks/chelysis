@@ -58,6 +58,8 @@
   --classification-miss: #ff7769;
   --classification-blunder: #fa412d;
   --classification-forced: #96af8b;
+  --status-loading: var(--classification-mistake);
+  --status-ready: var(--classification-forced);
 }
 *,
 *::before,
@@ -556,10 +558,24 @@ textarea::placeholder {
   background: var(--accent);
 }
 .engine-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   margin-top: 10px;
   color: var(--muted);
   font-size: 10px;
   text-align: center;
+}
+.engine-label::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  background: var(--status-loading);
+}
+.engine-label[data-ready="true"]::before {
+  background: var(--status-ready);
 }
 .keyboard-hint {
   display: flex;
