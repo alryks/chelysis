@@ -1,0 +1,6 @@
+selenium>=4.40,<5
+websockets>=15,<17
+protobuf>=6,<8
+python-chess>=1.999,<2
+undetected-chromedriver==3.5.5
+setuptools>=70

@@ -4,6 +4,7 @@ Next.js App Router, React, strict TypeScript, and Bun. Run commands from the rep
 
 - `src/app/`: route, document metadata, global styles.
 - `src/features/analysis/`: board, promotion picker, evaluation bar, game import, review state, and interface.
+- `src/lib/classification/`: reusable classification worker and abortable client; cancelled searches terminate immediately.
 - `src/lib/engine/`: typed UCI worker adapter with initialization, cancellation, serialized searches, and bounded cache.
 - `public/brand/`, `public/classification/`: original unmodified logo and classification icons.
 - `public/stockfish/`: generated from the pinned Stockfish package by `scripts/prepare-engine.ts`; never hand-edit or commit it.

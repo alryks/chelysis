@@ -1,5 +1,4 @@
 .DS_Store
-analysis/
 node_modules/
 .next/
 *.tsbuildinfo
@@ -7,3 +6,5 @@ coverage/
 playwright-report/
 test-results/
 frontend/public/stockfish/
+
+.codex/

@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useReducer, useState } from "react";
-import { classifyPosition, gameAt, type Evaluation } from "@chelysis/chess";
+import { gameAt, type Evaluation } from "@chelysis/chess";
 import { StockfishEngine } from "@/lib/engine/stockfish";
+import { ClassificationClient } from "@/lib/classification/client";
 import { initialReview, reviewReducer } from "./state";
 import { displayedEvaluation } from "./displayed-evaluation";
 import { playedMoveEvaluation } from "./move-evaluation";
@@ -9,6 +10,7 @@ import { playedMoveEvaluation } from "./move-evaluation";
 export function useReview() {
   const [state, dispatch] = useReducer(reviewReducer, initialReview);
   const [engine] = useState(() => new StockfishEngine());
+  const [classifier] = useState(() => new ClassificationClient());
   const [engineReady, setEngineReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -24,8 +26,9 @@ export function useReview() {
     return () => {
       mounted = false;
       engine.dispose();
+      classifier.dispose();
     };
-  }, [engine]);
+  }, [engine, classifier]);
 
   useEffect(() => {
     if (!state.enabled) return;
@@ -59,13 +62,17 @@ export function useReview() {
           () => search(moveIndex, position.move),
         );
         if (signal.aborted) return;
-        const classification = classifyPosition({
-          fen: position.fen,
-          bestMoves: position.bestMoves!,
-          playedMove: evaluation,
-          previousClassification:
-            line.positions[moveIndex - 1]?.playedMove?.classification,
-        });
+        const classification = await classifier.classify(
+          {
+            fen: position.fen,
+            bestMoves: position.bestMoves!,
+            playedMove: evaluation,
+            previousClassification:
+              line.positions[moveIndex - 1]?.playedMove?.classification,
+          },
+          signal,
+        );
+        if (signal.aborted) return;
         // These candidates will be needed for the next classification anyway.
         // Publish them with the move so arrows do not arrive a search later.
         // Leave the final position independent of game-review completion.
@@ -107,7 +114,7 @@ export function useReview() {
       }
     });
     return () => controller.abort();
-  }, [state, engine]);
+  }, [state, engine, classifier]);
   return {
     state,
     dispatch,

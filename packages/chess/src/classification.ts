@@ -88,13 +88,13 @@ function getCaptureTree(
   }
 
   let moves: (Move | null)[] = [];
+  let legalMoves: Move[] | undefined;
   if (move) {
     board.move(move);
 
     if (!squares) {
-      const firstMoves = board
-        .moves({ verbose: true })
-        .filter((mv) => mv.captured);
+      legalMoves = board.moves({ verbose: true });
+      const firstMoves = legalMoves.filter((mv) => mv.captured);
       squares = new Set(firstMoves.map((mv) => mv.to));
       for (const mv of firstMoves) {
         board.move(mv);
@@ -115,10 +115,10 @@ function getCaptureTree(
       value += pieceCost[move.promotion] - 1;
     }
 
-    moves = board
-      .moves({ verbose: true })
-      .filter((mv) => mv.captured && squares!.has(mv.to));
-    if (moves.length < board.moves().length && moves.length !== 0) {
+    // Temporary captures above are undone, so the root move list is still valid.
+    legalMoves ??= board.moves({ verbose: true });
+    moves = legalMoves.filter((mv) => mv.captured && squares!.has(mv.to));
+    if (moves.length < legalMoves.length && moves.length !== 0) {
       moves.push(null);
       if (value < 0 || depth === 12) moves = [];
     }
@@ -187,67 +187,37 @@ function isKing(game: Chess, move: string) {
   return game.get(move.slice(0, 2) as Square)?.type === "k";
 }
 
-function isBrilliant(
+/** Cheap prerequisites; rule out special labels before searching captures. */
+function canBeBrilliant(
   game: Chess,
   playedMove: Evaluation,
   secondBestMove: Evaluation,
-  captureTree: CaptureTree,
 ) {
-  // TODO: identify middlegame and endgame
-  const { sacrifice, pawnTaken } = isSacrifice(
-    game,
-    playedMove.move,
-    captureTree,
-  );
-  // console.log(playedMove.move, captureTree)
   return (
-    sacrifice > 0 &&
-    !pawnTaken &&
     ((playedMove.scoreType !== "mate" &&
       calculateWinChance(playedMove.score) > 30) ||
       (playedMove.scoreType === "mate" && playedMove.score > 0)) &&
     ((secondBestMove.scoreType !== "mate" &&
       calculateWinChance(secondBestMove.score) <= 85) ||
       (secondBestMove.scoreType === "mate" && secondBestMove.score < 0)) &&
-    // !isPawn(game, playedMove.move) &&
     (!isKing(game, playedMove.move) || !game.isCheck())
   );
 }
 
-function isGreatFind(
-  _prevGame: PreviousPosition | null,
-  game: Chess,
-  playedMove: Evaluation,
-  secondBestMove: Evaluation,
-  captureTree: CaptureTree,
-) {
-  // check for trades
-  const { sacrifice, pieceCaptured } = isSacrifice(
-    game,
-    playedMove.move,
-    captureTree,
-  );
-  if (sacrifice <= 0 && pieceCaptured) return false;
-
+function canBeGreatFind(playedMove: Evaluation, secondBestMove: Evaluation) {
   if (playedMove.scoreType !== "mate") {
     if (secondBestMove.scoreType === "mate") return true;
-    if (
+    return (
       (calculateWinChance(playedMove.score) > 70 &&
         calculateWinChance(secondBestMove.score) <= 70) ||
       (calculateWinChance(playedMove.score) > 30 &&
         calculateWinChance(secondBestMove.score) <= 30)
-    )
-      return true;
-  } else if (playedMove.score > 0) {
-    if (secondBestMove.scoreType === "mate") {
-      if (secondBestMove.score > 0) return false;
-      else return true;
-    } else {
-      return true;
-    }
-  } else {
-    return false;
+    );
   }
+  return (
+    playedMove.score > 0 &&
+    (secondBestMove.scoreType !== "mate" || secondBestMove.score <= 0)
+  );
 }
 
 export function classifyMoves(
@@ -275,11 +245,20 @@ export function classifyMoves(
 
   let classification: Classification = "best";
   if (bestMoves[0].move === playedMove.move) {
-    classification = "best";
+    const brilliantCandidate = canBeBrilliant(game, playedMove, bestMoves[1]);
+    const greatCandidate = canBeGreatFind(playedMove, bestMoves[1]);
+    if (!brilliantCandidate && !greatCandidate) return "best";
+
     const captureTree = getCaptureTree(game, moveObj);
-    if (isBrilliant(game, playedMove, bestMoves[1], captureTree))
+    const { sacrifice, pawnTaken, pieceCaptured } = isSacrifice(
+      game,
+      playedMove.move,
+      captureTree,
+    );
+    if (brilliantCandidate && sacrifice > 0 && !pawnTaken)
       classification = "brilliant";
-    if (isGreatFind(prevGame, game, playedMove, bestMoves[1], captureTree))
+    // Preserve Great Find's precedence over Brilliant and its trade exclusion.
+    if (greatCandidate && !(sacrifice <= 0 && pieceCaptured))
       classification = "greatFind";
     return classification;
   }

@@ -205,3 +205,28 @@ test("all eleven classifications retain their original rules", () => {
     expect(classifyPosition(input)).toBe(input.expected);
   }
 });
+
+test("early sacrifice rejection preserves centipawn thresholds and mate edge cases", () => {
+  const scores: Evaluation[] = [
+    ...[-5, -2.31, -2.3, 0, 2.3, 2.31, 4.71, 4.72, 7].map((score) =>
+      evaluation("", score),
+    ),
+    ...[-3, 0, 3].map((score) => evaluation("", score, "mate")),
+  ];
+  for (const [fen, move, alternative] of [
+    ["7k/8/8/8/8/8/8/KR6 w - - 0 1", "a1a2", "b1b2"],
+    ["6k1/5ppp/8/8/8/2B5/8/6K1 w - - 0 1", "c3g7", "c3d4"],
+  ]) {
+    for (const played of scores) {
+      for (const second of scores) {
+        const input = {
+          bestMoves: [{ ...played, move }, { ...second, move: alternative }],
+          playedMove: { ...played, move },
+        };
+        expect(classifyMoves(new Chess(fen), null, input)).toBe(
+          legacy.classifyMoves(new Chess(fen), null, input),
+        );
+      }
+    }
+  }
+});
