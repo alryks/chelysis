@@ -1,3 +1,5 @@
+exports/
+
 .DS_Store
 node_modules/
 .next/
@@ -6,5 +8,8 @@ coverage/
 playwright-report/
 test-results/
 frontend/public/stockfish/
+
+__pycache__/
+.venv/
 
 .codex/
